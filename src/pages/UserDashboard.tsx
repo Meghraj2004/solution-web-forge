@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -16,11 +15,43 @@ import { collection, onSnapshot, query, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import HelpRequestForm from "@/components/user/HelpRequestForm";
 
+interface EmergencyAlert {
+  id: string;
+  type: string;
+  location: string;
+  severity: string;
+  description: string;
+  resolved: boolean;
+  createdAt: any;
+}
+
+interface HelpRequest {
+  id: string;
+  userId: string;
+  userName: string;
+  type: string;
+  location: string;
+  description: string;
+  status: string;
+  priority: string;
+  createdAt: any;
+}
+
+interface HealthUnit {
+  id: string;
+  name: string;
+  location: string;
+  staff: number;
+  status: string;
+  equipment: string;
+  createdAt: any;
+}
+
 const UserDashboard = () => {
   const { userProfile, logout } = useAuth();
-  const [safetyAlerts, setSafetyAlerts] = useState<any[]>([]);
-  const [myHelpRequests, setMyHelpRequests] = useState<any[]>([]);
-  const [healthUnits, setHealthUnits] = useState<any[]>([]);
+  const [safetyAlerts, setSafetyAlerts] = useState<EmergencyAlert[]>([]);
+  const [myHelpRequests, setMyHelpRequests] = useState<HelpRequest[]>([]);
+  const [healthUnits, setHealthUnits] = useState<HealthUnit[]>([]);
 
   const [emergencyContacts] = useState([
     { name: "Emergency Hotline", number: "1-800-PILGRIM", type: "Emergency" },
@@ -41,7 +72,7 @@ const UserDashboard = () => {
       const alerts = snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
-      })).filter(alert => !alert.resolved);
+      } as EmergencyAlert)).filter(alert => !alert.resolved);
       setSafetyAlerts(alerts);
     });
 
@@ -53,7 +84,7 @@ const UserDashboard = () => {
           const requests = snapshot.docs.map(doc => ({
             id: doc.id,
             ...doc.data()
-          }));
+          } as HelpRequest));
           setMyHelpRequests(requests);
         }
       );
@@ -69,7 +100,7 @@ const UserDashboard = () => {
       const units = snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
-      })).filter(unit => unit.status === 'active');
+      } as HealthUnit)).filter(unit => unit.status === 'active');
       setHealthUnits(units.slice(0, 4)); // Show nearest 4 units
     });
 

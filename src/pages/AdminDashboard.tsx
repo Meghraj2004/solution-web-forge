@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -19,10 +18,32 @@ import SurveillanceManagement from "@/components/admin/SurveillanceManagement";
 import HealthUnitsManagement from "@/components/admin/HealthUnitsManagement";
 import EmergencyAlertsManagement from "@/components/admin/EmergencyAlertsManagement";
 
+interface EmergencyAlert {
+  id: string;
+  type: string;
+  location: string;
+  severity: string;
+  description: string;
+  resolved: boolean;
+  createdAt: any;
+}
+
+interface HelpRequest {
+  id: string;
+  userId: string;
+  userName: string;
+  type: string;
+  location: string;
+  description: string;
+  status: string;
+  priority: string;
+  createdAt: any;
+}
+
 const AdminDashboard = () => {
   const { userProfile, logout } = useAuth();
-  const [activeAlerts, setActiveAlerts] = useState<any[]>([]);
-  const [helpRequests, setHelpRequests] = useState<any[]>([]);
+  const [activeAlerts, setActiveAlerts] = useState<EmergencyAlert[]>([]);
+  const [helpRequests, setHelpRequests] = useState<HelpRequest[]>([]);
   const [realTimeData, setRealTimeData] = useState({
     totalUsers: 0,
     activeCameras: 152,
@@ -45,7 +66,7 @@ const AdminDashboard = () => {
       const alerts = snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
-      })).filter(alert => !alert.resolved);
+      } as EmergencyAlert)).filter(alert => !alert.resolved);
       setActiveAlerts(alerts);
     });
 
@@ -54,7 +75,7 @@ const AdminDashboard = () => {
       const requests = snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
-      }));
+      } as HelpRequest));
       setHelpRequests(requests);
       setRealTimeData(prev => ({
         ...prev,
