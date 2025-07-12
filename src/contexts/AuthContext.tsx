@@ -48,34 +48,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const result = await signInWithEmailAndPassword(auth, email, password);
       console.log('Login successful:', result.user.uid);
       
-      // Try to get user profile, but don't fail if Firestore rules aren't set up
-      try {
-        const userDoc = await getDoc(doc(db, 'users', result.user.uid));
-        if (userDoc.exists()) {
-          setUserProfile(userDoc.data() as UserProfile);
-        } else {
-          // Create a default profile if none exists
-          const defaultProfile: UserProfile = {
-            uid: result.user.uid,
-            email: result.user.email!,
-            displayName: result.user.displayName || 'User',
-            role: 'user',
-            createdAt: new Date()
-          };
-          setUserProfile(defaultProfile);
-        }
-      } catch (firestoreError) {
-        console.log('Firestore permission error, using default profile:', firestoreError);
-        // Create a temporary profile for the session
-        const tempProfile: UserProfile = {
-          uid: result.user.uid,
-          email: result.user.email!,
-          displayName: result.user.displayName || 'User',
-          role: 'user',
-          createdAt: new Date()
-        };
-        setUserProfile(tempProfile);
-      }
+      // Wait for the auth state change to handle profile loading
+      // Don't set profile here to avoid race conditions
     } catch (error) {
       console.error('Login error:', error);
       throw error;
@@ -95,15 +69,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         createdAt: new Date()
       };
       
-      // Try to save to Firestore, but don't fail if permissions aren't set up
+      // Try to save to Firestore
       try {
         await setDoc(doc(db, 'users', result.user.uid), userProfile);
         console.log('User profile saved to Firestore');
+        setUserProfile(userProfile);
       } catch (firestoreError) {
-        console.log('Firestore permission error, profile not saved:', firestoreError);
+        console.log('Firestore permission error, using local profile:', firestoreError);
+        // Store in localStorage as backup
+        localStorage.setItem(`user_profile_${result.user.uid}`, JSON.stringify(userProfile));
+        setUserProfile(userProfile);
       }
-      
-      setUserProfile(userProfile);
     } catch (error) {
       console.error('Registration error:', error);
       throw error;
@@ -122,31 +98,52 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       if (user) {
         try {
+          // First try to get from Firestore
           const userDoc = await getDoc(doc(db, 'users', user.uid));
           if (userDoc.exists()) {
-            setUserProfile(userDoc.data() as UserProfile);
+            const profileData = userDoc.data() as UserProfile;
+            console.log('Profile loaded from Firestore:', profileData.role);
+            setUserProfile(profileData);
           } else {
-            // Create default profile if none exists
-            const defaultProfile: UserProfile = {
+            // Try to get from localStorage as backup
+            const localProfile = localStorage.getItem(`user_profile_${user.uid}`);
+            if (localProfile) {
+              const profileData = JSON.parse(localProfile) as UserProfile;
+              console.log('Profile loaded from localStorage:', profileData.role);
+              setUserProfile(profileData);
+            } else {
+              // Create default profile only if no data exists anywhere
+              const defaultProfile: UserProfile = {
+                uid: user.uid,
+                email: user.email!,
+                displayName: user.displayName || 'User',
+                role: 'user',
+                createdAt: new Date()
+              };
+              console.log('Created default profile');
+              setUserProfile(defaultProfile);
+            }
+          }
+        } catch (firestoreError) {
+          console.log('Firestore permission error, trying localStorage:', firestoreError);
+          // Try localStorage backup
+          const localProfile = localStorage.getItem(`user_profile_${user.uid}`);
+          if (localProfile) {
+            const profileData = JSON.parse(localProfile) as UserProfile;
+            console.log('Profile loaded from localStorage backup:', profileData.role);
+            setUserProfile(profileData);
+          } else {
+            // Last resort: temporary profile
+            const tempProfile: UserProfile = {
               uid: user.uid,
               email: user.email!,
               displayName: user.displayName || 'User',
               role: 'user',
               createdAt: new Date()
             };
-            setUserProfile(defaultProfile);
+            console.log('Using temporary profile');
+            setUserProfile(tempProfile);
           }
-        } catch (firestoreError) {
-          console.log('Firestore permission error, using temporary profile:', firestoreError);
-          // Use temporary profile
-          const tempProfile: UserProfile = {
-            uid: user.uid,
-            email: user.email!,
-            displayName: user.displayName || 'User',
-            role: 'user',
-            createdAt: new Date()
-          };
-          setUserProfile(tempProfile);
         }
       } else {
         setUserProfile(null);
