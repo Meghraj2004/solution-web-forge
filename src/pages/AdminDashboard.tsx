@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -8,30 +9,27 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { 
   Shield, Users, Camera, AlertTriangle, MapPin, Activity, 
   Phone, Clock, ChevronLeft, Settings, Bell, Eye,
-  TrendingUp, TrendingDown, Zap, Heart, LogOut
+  TrendingUp, TrendingDown, Zap, Heart, LogOut, Database
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
-import { collection, onSnapshot, addDoc, serverTimestamp } from "firebase/firestore";
+import { collection, onSnapshot } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import SurveillanceManagement from "@/components/admin/SurveillanceManagement";
+import HealthUnitsManagement from "@/components/admin/HealthUnitsManagement";
+import EmergencyAlertsManagement from "@/components/admin/EmergencyAlertsManagement";
 
 const AdminDashboard = () => {
   const { userProfile, logout } = useAuth();
   const [activeAlerts, setActiveAlerts] = useState<any[]>([]);
+  const [helpRequests, setHelpRequests] = useState<any[]>([]);
   const [realTimeData, setRealTimeData] = useState({
     totalUsers: 0,
     activeCameras: 152,
     totalCameras: 156,
     emergencyUnits: 12,
-    responseTime: 2.3
-  });
-
-  const [surveillanceData] = useState({
-    totalCameras: 156,
-    activeCameras: 152,
-    crowdDensity: 78,
-    emergencyUnits: 12,
-    responseTime: 2.3
+    responseTime: 2.3,
+    helpRequestsCount: 0
   });
 
   const [pilgrimStats] = useState([
@@ -42,13 +40,26 @@ const AdminDashboard = () => {
   ]);
 
   useEffect(() => {
-    // Real-time alerts listener
-    const unsubscribeAlerts = onSnapshot(collection(db, 'alerts'), (snapshot) => {
+    // Real-time emergency alerts listener
+    const unsubscribeAlerts = onSnapshot(collection(db, 'emergency_alerts'), (snapshot) => {
       const alerts = snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
-      }));
+      })).filter(alert => !alert.resolved);
       setActiveAlerts(alerts);
+    });
+
+    // Real-time help requests listener
+    const unsubscribeHelp = onSnapshot(collection(db, 'help_requests'), (snapshot) => {
+      const requests = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      setHelpRequests(requests);
+      setRealTimeData(prev => ({
+        ...prev,
+        helpRequestsCount: requests.filter(req => req.status === 'pending').length
+      }));
     });
 
     // Real-time users count
@@ -61,23 +72,10 @@ const AdminDashboard = () => {
 
     return () => {
       unsubscribeAlerts();
+      unsubscribeHelp();
       unsubscribeUsers();
     };
   }, []);
-
-  const createTestAlert = async () => {
-    try {
-      await addDoc(collection(db, 'alerts'), {
-        type: "High Crowd Density",
-        location: "Main Gate",
-        severity: "High",
-        timestamp: serverTimestamp(),
-        resolved: false
-      });
-    } catch (error) {
-      console.error("Error creating alert:", error);
-    }
-  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-card to-background">
@@ -105,6 +103,10 @@ const AdminDashboard = () => {
                 <Bell className="h-4 w-4 mr-2" />
                 Alerts ({activeAlerts.length})
               </Button>
+              <Button variant="outline" size="sm" className="border-primary/20">
+                <Phone className="h-4 w-4 mr-2" />
+                Help ({realTimeData.helpRequestsCount})
+              </Button>
               <Button variant="ghost" size="sm" onClick={logout}>
                 <LogOut className="h-4 w-4" />
               </Button>
@@ -114,17 +116,10 @@ const AdminDashboard = () => {
       </header>
 
       <div className="p-6">
-        {/* Test Button for Demo */}
-        <div className="mb-4">
-          <Button onClick={createTestAlert} className="bg-primary hover:bg-primary/90">
-            Create Test Alert
-          </Button>
-        </div>
-
         {/* Emergency Alerts */}
         {activeAlerts.length > 0 && (
           <div className="mb-6 space-y-3">
-            {activeAlerts.map((alert) => (
+            {activeAlerts.slice(0, 3).map((alert) => (
               <Alert key={alert.id} className={`border-l-4 ${
                 alert.severity === 'Critical' ? 'border-destructive bg-destructive/10' :
                 alert.severity === 'High' ? 'border-orange-500 bg-orange-500/10' :
@@ -138,7 +133,7 @@ const AdminDashboard = () => {
                   </Badge>
                 </AlertTitle>
                 <AlertDescription>
-                  Real-time Firebase alert • Response team dispatched
+                  {alert.description} • Response team dispatched
                 </AlertDescription>
               </Alert>
             ))}
@@ -147,17 +142,31 @@ const AdminDashboard = () => {
 
         {/* Main Dashboard */}
         <Tabs defaultValue="overview" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-5 bg-card/60 backdrop-blur-sm">
+          <TabsList className="grid w-full grid-cols-6 bg-card/60 backdrop-blur-sm">
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="surveillance">Surveillance</TabsTrigger>
-            <TabsTrigger value="emergency">Emergency</TabsTrigger>
-            <TabsTrigger value="crowd">Crowd Control</TabsTrigger>
             <TabsTrigger value="health">Health Units</TabsTrigger>
+            <TabsTrigger value="alerts">Alerts</TabsTrigger>
+            <TabsTrigger value="help-requests">Help Requests</TabsTrigger>
+            <TabsTrigger value="crowd">Crowd Control</TabsTrigger>
           </TabsList>
 
           <TabsContent value="overview" className="space-y-6">
             {/* Key Metrics */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              <Card className="bg-card/60 backdrop-blur-sm border-border/50 hover:border-primary/20 transition-colors">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Active Help Requests</CardTitle>
+                  <Phone className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold text-primary">{realTimeData.helpRequestsCount}</div>
+                  <p className="text-xs text-muted-foreground">
+                    Pending assistance
+                  </p>
+                </CardContent>
+              </Card>
+
               <Card className="bg-card/60 backdrop-blur-sm border-border/50 hover:border-primary/20 transition-colors">
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                   <CardTitle className="text-sm font-medium">Registered Users</CardTitle>
@@ -174,13 +183,13 @@ const AdminDashboard = () => {
 
               <Card className="bg-card/60 backdrop-blur-sm border-border/50 hover:border-primary/20 transition-colors">
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Surveillance Status</CardTitle>
-                  <Camera className="h-4 w-4 text-muted-foreground" />
+                  <CardTitle className="text-sm font-medium">Active Alerts</CardTitle>
+                  <AlertTriangle className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold text-primary">{realTimeData.activeCameras}/{realTimeData.totalCameras}</div>
+                  <div className="text-2xl font-bold text-primary">{activeAlerts.length}</div>
                   <p className="text-xs text-muted-foreground">
-                    97% operational
+                    Emergency situations
                   </p>
                 </CardContent>
               </Card>
@@ -195,19 +204,6 @@ const AdminDashboard = () => {
                   <p className="text-xs text-muted-foreground">
                     <TrendingDown className="inline h-3 w-3 mr-1 text-green-400" />
                     Improved by 15%
-                  </p>
-                </CardContent>
-              </Card>
-
-              <Card className="bg-card/60 backdrop-blur-sm border-border/50 hover:border-primary/20 transition-colors">
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Emergency Units</CardTitle>
-                  <Zap className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold text-primary">{realTimeData.emergencyUnits}</div>
-                  <p className="text-xs text-muted-foreground">
-                    All units active
                   </p>
                 </CardContent>
               </Card>
@@ -249,117 +245,57 @@ const AdminDashboard = () => {
           </TabsContent>
 
           <TabsContent value="surveillance" className="space-y-6">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <Card className="bg-card/60 backdrop-blur-sm border-border/50">
-                <CardHeader>
-                  <CardTitle className="flex items-center text-foreground">
-                    <Camera className="h-5 w-5 mr-2" />
-                    AI Surveillance Network
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    <div className="flex justify-between items-center">
-                      <span className="text-foreground">Facial Recognition System</span>
-                      <Badge className="bg-green-500/20 text-green-400 border-green-500/30">Active</Badge>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-foreground">Crowd Flow Algorithm</span>
-                      <Badge className="bg-green-500/20 text-green-400 border-green-500/30">Processing</Badge>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-foreground">Lost & Found System</span>
-                      <Badge className="bg-green-500/20 text-green-400 border-green-500/30">Monitoring</Badge>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-foreground">Traffic Monitoring</span>
-                      <Badge className="bg-yellow-500/20 text-yellow-400 border-yellow-500/30">Alert</Badge>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="bg-card/60 backdrop-blur-sm border-border/50">
-                <CardHeader>
-                  <CardTitle className="flex items-center text-foreground">
-                    <Eye className="h-5 w-5 mr-2" />
-                    Camera Grid Status
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-4 gap-2">
-                    {Array.from({ length: 16 }, (_, i) => (
-                      <div
-                        key={i}
-                        className={`w-12 h-12 rounded border-2 flex items-center justify-center text-xs font-medium ${
-                          Math.random() > 0.1
-                            ? 'bg-green-500/20 border-green-500/30 text-green-400'
-                            : 'bg-red-500/20 border-red-500/30 text-red-400'
-                        }`}
-                      >
-                        {i + 1}
-                      </div>
-                    ))}
-                  </div>
-                  <p className="text-sm text-muted-foreground mt-4">
-                    Green: Active • Red: Offline • Coverage: 100km range
-                  </p>
-                </CardContent>
-              </Card>
-            </div>
+            <SurveillanceManagement />
           </TabsContent>
 
-          <TabsContent value="emergency" className="space-y-6">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center">
-                    <AlertTriangle className="h-5 w-5 mr-2" />
-                    Disaster Preparedness
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <Button className="w-full justify-start" variant="outline">
-                    <AlertTriangle className="h-4 w-4 mr-2" />
-                    Initiate Fire Evacuation Protocol
-                  </Button>
-                  <Button className="w-full justify-start" variant="outline">
-                    <Users className="h-4 w-4 mr-2" />
-                    Activate Crowd Dispersal System
-                  </Button>
-                  <Button className="w-full justify-start" variant="outline">
-                    <Phone className="h-4 w-4 mr-2" />
-                    Emergency Communication Broadcast
-                  </Button>
-                  <Button className="w-full justify-start" variant="outline">
-                    <MapPin className="h-4 w-4 mr-2" />
-                    Deploy Mobile Response Units
-                  </Button>
-                </CardContent>
-              </Card>
+          <TabsContent value="health" className="space-y-6">
+            <HealthUnitsManagement />
+          </TabsContent>
 
-              <Card>
-                <CardHeader>
-                  <CardTitle>Emergency Response Status</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between p-3 bg-green-50 rounded">
-                      <span className="font-medium">Fire Safety Systems</span>
-                      <Badge className="bg-green-100 text-green-800">Operational</Badge>
-                    </div>
-                    <div className="flex items-center justify-between p-3 bg-green-50 rounded">
-                      <span className="font-medium">Medical Response Teams</span>
-                      <Badge className="bg-green-100 text-green-800">12 Units Ready</Badge>
-                    </div>
-                    <div className="flex items-center justify-between p-3 bg-yellow-50 rounded">
-                      <span className="font-medium">Weather Monitoring</span>
-                      <Badge className="bg-yellow-100 text-yellow-800">Storm Warning</Badge>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
+          <TabsContent value="alerts" className="space-y-6">
+            <EmergencyAlertsManagement />
+          </TabsContent>
+
+          <TabsContent value="help-requests" className="space-y-6">
+            <Card className="bg-card/60 backdrop-blur-sm border-border/50">
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  <Phone className="h-5 w-5 mr-2" />
+                  Help Requests ({helpRequests.length})
+                </CardTitle>
+                <CardDescription>Real-time user assistance requests</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {helpRequests.length === 0 ? (
+                    <p className="text-center text-muted-foreground py-8">No help requests at this time</p>
+                  ) : (
+                    helpRequests.map((request) => (
+                      <div key={request.id} className="flex items-center justify-between p-4 border border-border/50 rounded-lg bg-card/30 backdrop-blur-sm">
+                        <div className="flex items-center space-x-4">
+                          <div className={`w-3 h-3 rounded-full ${
+                            request.priority === 'high' ? 'bg-red-500' : 'bg-orange-500'
+                          }`} />
+                          <div>
+                            <div className="font-medium text-foreground">{request.type.toUpperCase()} - {request.userName}</div>
+                            <div className="text-sm text-muted-foreground">{request.location}</div>
+                            <div className="text-sm text-muted-foreground">{request.description}</div>
+                          </div>
+                        </div>
+                        <div className="flex items-center space-x-4">
+                          <Badge variant={request.status === 'pending' ? 'destructive' : 'default'}>
+                            {request.status}
+                          </Badge>
+                          <Badge variant={request.priority === 'high' ? 'destructive' : 'secondary'}>
+                            {request.priority} priority
+                          </Badge>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </CardContent>
+            </Card>
           </TabsContent>
 
           <TabsContent value="crowd" className="space-y-6">
@@ -385,35 +321,6 @@ const AdminDashboard = () => {
                     <div className="text-sm text-gray-600">Avg Flow Speed</div>
                     <Badge className="mt-2 bg-orange-100 text-orange-800">Monitored</Badge>
                   </div>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="health" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center">
-                  <Heart className="h-5 w-5 mr-2" />
-                  Mobile Medical Units
-                </CardTitle>
-                <CardDescription>Primary health centres and emergency response</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {Array.from({ length: 6 }, (_, i) => (
-                    <div key={i} className="p-4 border rounded-lg">
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="font-medium">Unit {i + 1}</span>
-                        <Badge className="bg-green-100 text-green-800">Active</Badge>
-                      </div>
-                      <div className="text-sm text-gray-600 space-y-1">
-                        <div>Location: Zone {String.fromCharCode(65 + i)}</div>
-                        <div>Staff: 4 personnel</div>
-                        <div>Last Response: {Math.floor(Math.random() * 60)} min ago</div>
-                      </div>
-                    </div>
-                  ))}
                 </div>
               </CardContent>
             </Card>
