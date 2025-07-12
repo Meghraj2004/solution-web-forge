@@ -44,27 +44,70 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
 
   const login = async (email: string, password: string) => {
-    const result = await signInWithEmailAndPassword(auth, email, password);
-    const userDoc = await getDoc(doc(db, 'users', result.user.uid));
-    if (userDoc.exists()) {
-      setUserProfile(userDoc.data() as UserProfile);
+    try {
+      const result = await signInWithEmailAndPassword(auth, email, password);
+      console.log('Login successful:', result.user.uid);
+      
+      // Try to get user profile, but don't fail if Firestore rules aren't set up
+      try {
+        const userDoc = await getDoc(doc(db, 'users', result.user.uid));
+        if (userDoc.exists()) {
+          setUserProfile(userDoc.data() as UserProfile);
+        } else {
+          // Create a default profile if none exists
+          const defaultProfile: UserProfile = {
+            uid: result.user.uid,
+            email: result.user.email!,
+            displayName: result.user.displayName || 'User',
+            role: 'user',
+            createdAt: new Date()
+          };
+          setUserProfile(defaultProfile);
+        }
+      } catch (firestoreError) {
+        console.log('Firestore permission error, using default profile:', firestoreError);
+        // Create a temporary profile for the session
+        const tempProfile: UserProfile = {
+          uid: result.user.uid,
+          email: result.user.email!,
+          displayName: result.user.displayName || 'User',
+          role: 'user',
+          createdAt: new Date()
+        };
+        setUserProfile(tempProfile);
+      }
+    } catch (error) {
+      console.error('Login error:', error);
+      throw error;
     }
   };
 
   const register = async (email: string, password: string, displayName: string, role: 'admin' | 'user') => {
-    const result = await createUserWithEmailAndPassword(auth, email, password);
-    await updateProfile(result.user, { displayName });
-    
-    const userProfile: UserProfile = {
-      uid: result.user.uid,
-      email: result.user.email!,
-      displayName,
-      role,
-      createdAt: new Date()
-    };
-    
-    await setDoc(doc(db, 'users', result.user.uid), userProfile);
-    setUserProfile(userProfile);
+    try {
+      const result = await createUserWithEmailAndPassword(auth, email, password);
+      await updateProfile(result.user, { displayName });
+      
+      const userProfile: UserProfile = {
+        uid: result.user.uid,
+        email: result.user.email!,
+        displayName,
+        role,
+        createdAt: new Date()
+      };
+      
+      // Try to save to Firestore, but don't fail if permissions aren't set up
+      try {
+        await setDoc(doc(db, 'users', result.user.uid), userProfile);
+        console.log('User profile saved to Firestore');
+      } catch (firestoreError) {
+        console.log('Firestore permission error, profile not saved:', firestoreError);
+      }
+      
+      setUserProfile(userProfile);
+    } catch (error) {
+      console.error('Registration error:', error);
+      throw error;
+    }
   };
 
   const logout = async () => {
@@ -74,11 +117,36 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      console.log('Auth state changed:', user?.uid);
       setCurrentUser(user);
+      
       if (user) {
-        const userDoc = await getDoc(doc(db, 'users', user.uid));
-        if (userDoc.exists()) {
-          setUserProfile(userDoc.data() as UserProfile);
+        try {
+          const userDoc = await getDoc(doc(db, 'users', user.uid));
+          if (userDoc.exists()) {
+            setUserProfile(userDoc.data() as UserProfile);
+          } else {
+            // Create default profile if none exists
+            const defaultProfile: UserProfile = {
+              uid: user.uid,
+              email: user.email!,
+              displayName: user.displayName || 'User',
+              role: 'user',
+              createdAt: new Date()
+            };
+            setUserProfile(defaultProfile);
+          }
+        } catch (firestoreError) {
+          console.log('Firestore permission error, using temporary profile:', firestoreError);
+          // Use temporary profile
+          const tempProfile: UserProfile = {
+            uid: user.uid,
+            email: user.email!,
+            displayName: user.displayName || 'User',
+            role: 'user',
+            createdAt: new Date()
+          };
+          setUserProfile(tempProfile);
         }
       } else {
         setUserProfile(null);
