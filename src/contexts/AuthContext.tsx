@@ -49,7 +49,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const result = await signInWithEmailAndPassword(auth, email, password);
       console.log('Login successful:', result.user.uid);
       
-      // The auth state change handler will load the profile
+      // Load user profile after successful login
+      const profile = await loadUserProfile(result.user);
+      if (profile) {
+        setUserProfile(profile);
+        console.log(`User logged in with role: ${profile.role}`);
+        
+        // Auto-redirect based on role
+        const targetPath = profile.role === 'admin' ? '/admin' : '/user';
+        window.history.replaceState(null, '', targetPath);
+      }
     } catch (error) {
       console.error('Login error:', error);
       throw error;
@@ -101,6 +110,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (userDoc.exists()) {
         const profileData = userDoc.data() as UserProfile;
         console.log('Profile loaded from Firestore:', profileData);
+        
+        // Ensure the profile has a valid role
+        if (!profileData.role || (profileData.role !== 'admin' && profileData.role !== 'user')) {
+          console.warn('Profile has invalid role, defaulting to user');
+          profileData.role = 'user';
+        }
+        
         return profileData;
       }
       
@@ -109,20 +125,54 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (localProfile) {
         const profileData = JSON.parse(localProfile) as UserProfile;
         console.log('Profile loaded from localStorage:', profileData);
+        
+        // Ensure the profile has a valid role
+        if (!profileData.role || (profileData.role !== 'admin' && profileData.role !== 'user')) {
+          console.warn('Profile has invalid role, defaulting to user');
+          profileData.role = 'user';
+        }
+        
         return profileData;
       }
       
-      console.log('No existing profile found, this should only happen for very old accounts');
-      return null;
+      console.log('No existing profile found, creating default profile');
+      
+      // Create a default user profile if none exists
+      const defaultProfile: UserProfile = {
+        uid: user.uid,
+        email: user.email!,
+        displayName: user.displayName || 'User',
+        phoneNumber: user.phoneNumber || undefined,
+        role: 'user', // Default to user role
+        createdAt: new Date()
+      };
+      
+      // Try to save this default profile
+      try {
+        await setDoc(doc(db, 'users', user.uid), defaultProfile);
+        console.log('Default profile saved to Firestore');
+      } catch (error) {
+        console.log('Could not save default profile to Firestore, using localStorage:', error);
+        localStorage.setItem(`user_profile_${user.uid}`, JSON.stringify(defaultProfile));
+      }
+      
+      return defaultProfile;
       
     } catch (error) {
-      console.log('Error loading profile from Firestore, trying localStorage:', error);
+      console.error('Error loading profile:', error);
       
       // Try localStorage backup
       const localProfile = localStorage.getItem(`user_profile_${user.uid}`);
       if (localProfile) {
         const profileData = JSON.parse(localProfile) as UserProfile;
         console.log('Profile loaded from localStorage backup:', profileData);
+        
+        // Ensure the profile has a valid role
+        if (!profileData.role || (profileData.role !== 'admin' && profileData.role !== 'user')) {
+          console.warn('Profile has invalid role, defaulting to user');
+          profileData.role = 'user';
+        }
+        
         return profileData;
       }
       
@@ -137,32 +187,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       if (user) {
         const profile = await loadUserProfile(user);
+        setUserProfile(profile);
         
         if (profile) {
-          setUserProfile(profile);
-          console.log(`User logged in with role: ${profile.role}`);
-        } else {
-          // Only create default profile if absolutely no data exists
-          // This should rarely happen for new registrations
-          const defaultProfile: UserProfile = {
-            uid: user.uid,
-            email: user.email!,
-            displayName: user.displayName || 'User',
-            phoneNumber: user.phoneNumber || undefined,
-            role: 'user', // Default to user role
-            createdAt: new Date()
-          };
-          
-          console.log('Created temporary default profile - consider re-registering for proper role assignment');
-          setUserProfile(defaultProfile);
-          
-          // Try to save this default profile for future use
-          try {
-            await setDoc(doc(db, 'users', user.uid), defaultProfile);
-            localStorage.setItem(`user_profile_${user.uid}`, JSON.stringify(defaultProfile));
-          } catch (error) {
-            console.log('Could not save default profile:', error);
-          }
+          console.log(`User authenticated with role: ${profile.role}`);
         }
       } else {
         setUserProfile(null);
@@ -185,7 +213,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   return (
     <AuthContext.Provider value={value}>
-      {!loading && children}
+      {children}
     </AuthContext.Provider>
   );
 };
