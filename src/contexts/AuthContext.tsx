@@ -15,6 +15,7 @@ interface UserProfile {
   uid: string;
   email: string;
   displayName?: string;
+  phoneNumber?: string;
   role: 'admin' | 'user';
   createdAt: Date;
 }
@@ -65,6 +66,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         uid: result.user.uid,
         email: result.user.email!,
         displayName,
+        phoneNumber: result.user.phoneNumber || undefined,
         role,
         createdAt: new Date()
       };
@@ -117,6 +119,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 uid: user.uid,
                 email: user.email!,
                 displayName: user.displayName || 'User',
+                phoneNumber: user.phoneNumber || undefined,
                 role: 'user',
                 createdAt: new Date()
               };
@@ -138,6 +141,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               uid: user.uid,
               email: user.email!,
               displayName: user.displayName || 'User',
+              phoneNumber: user.phoneNumber || undefined,
               role: 'user',
               createdAt: new Date()
             };

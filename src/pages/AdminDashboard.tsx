@@ -42,14 +42,56 @@ interface HelpRequest {
   createdAt: any;
 }
 
+interface SOSAlert {
+  id: string;
+  userId: string;
+  userName: string;
+  userPhone: string;
+  location: { lat: number; lng: number };
+  locationString: string;
+  timestamp: any;
+  status: string;
+  type: string;
+  priority: string;
+}
+
+interface Volunteer {
+  id: string;
+  name: string;
+  skills: string[];
+  availability: string;
+  location: string;
+  contactInfo: string;
+}
+
+interface LostItem {
+  id: string;
+  title: string;
+  description: string;
+  location: string;
+  status: string;
+  reportedBy: string;
+  timestamp: any;
+}
+
+interface FoodPoint {
+  id: string;
+  title: string;
+  description: string;
+  location: string;
+  status: string;
+  contactInfo: string;
+  timestamp: any;
+}
+
 const AdminDashboard = () => {
   const { userProfile, logout } = useAuth();
   const [activeAlerts, setActiveAlerts] = useState<EmergencyAlert[]>([]);
   const [helpRequests, setHelpRequests] = useState<HelpRequest[]>([]);
-  const [sosAlerts, setSosAlerts] = useState<any[]>([]);
-  const [volunteers, setVolunteers] = useState<any[]>([]);
-  const [lostItems, setLostItems] = useState<any[]>([]);
-  const [foodPoints, setFoodPoints] = useState<any[]>([]);
+  const [sosAlerts, setSosAlerts] = useState<SOSAlert[]>([]);
+  const [volunteers, setVolunteers] = useState<Volunteer[]>([]);
+  const [lostItems, setLostItems] = useState<LostItem[]>([]);
+  const [foodPoints, setFoodPoints] = useState<FoodPoint[]>([]);
   const [realTimeData, setRealTimeData] = useState({
     totalUsers: 0,
     activeCameras: 152,
@@ -103,25 +145,37 @@ const AdminDashboard = () => {
 
     // New real-time listeners for additional features
     const unsubscribeSOS = onSnapshot(collection(db, 'sos_alerts'), (snapshot) => {
-      const alerts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      const alerts = snapshot.docs.map(doc => ({ 
+        id: doc.id, 
+        ...doc.data() 
+      } as SOSAlert));
       setSosAlerts(alerts.filter(alert => alert.status === 'active'));
       setRealTimeData(prev => ({ ...prev, sosAlertsCount: alerts.filter(alert => alert.status === 'active').length }));
     });
 
     const unsubscribeVolunteers = onSnapshot(collection(db, 'volunteers'), (snapshot) => {
-      const vols = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      const vols = snapshot.docs.map(doc => ({ 
+        id: doc.id, 
+        ...doc.data() 
+      } as Volunteer));
       setVolunteers(vols);
       setRealTimeData(prev => ({ ...prev, activeVolunteers: vols.filter(v => v.availability === 'available').length }));
     });
 
     const unsubscribeLostFound = onSnapshot(collection(db, 'lost_found'), (snapshot) => {
-      const items = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      const items = snapshot.docs.map(doc => ({ 
+        id: doc.id, 
+        ...doc.data() 
+      } as LostItem));
       setLostItems(items);
       setRealTimeData(prev => ({ ...prev, lostItemsCount: items.filter(item => item.status === 'lost').length }));
     });
 
     const unsubscribeFood = onSnapshot(collection(db, 'food_points'), (snapshot) => {
-      const points = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      const points = snapshot.docs.map(doc => ({ 
+        id: doc.id, 
+        ...doc.data() 
+      } as FoodPoint));
       setFoodPoints(points);
       setRealTimeData(prev => ({ ...prev, activeFoodPoints: points.filter(p => p.status === 'available').length }));
     });
