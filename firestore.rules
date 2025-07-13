@@ -105,6 +105,15 @@ service cloud.firestore {
         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
     
+    // Location status & crowd density - allow authenticated users to read, admins to manage
+    match /location_status/{locationId} {
+      allow read: if request.auth != null;
+      
+      allow create, update, delete: if request.auth != null && 
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+    
     // Surveillance cameras - allow authenticated users to read, admins to manage
     match /surveillance_cameras/{cameraId} {
       allow read: if request.auth != null;

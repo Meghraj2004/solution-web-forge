@@ -19,6 +19,7 @@ import SurveillanceManagement from "@/components/admin/SurveillanceManagement";
 import HealthUnitsManagement from "@/components/admin/HealthUnitsManagement";
 import EmergencyAlertsManagement from "@/components/admin/EmergencyAlertsManagement";
 import AIAnalytics from "@/components/admin/AIAnalytics";
+import LocationManagement from "@/components/admin/LocationManagement";
 
 interface EmergencyAlert {
   id: string;
@@ -269,13 +270,14 @@ const AdminDashboard = () => {
 
         {/* Main Dashboard */}
         <Tabs defaultValue="overview" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-8 bg-card/60 backdrop-blur-sm">
+          <TabsList className="grid w-full grid-cols-9 bg-card/60 backdrop-blur-sm">
             <TabsTrigger value="overview">Overview</TabsTrigger>
+            <TabsTrigger value="locations">Locations</TabsTrigger>
             <TabsTrigger value="ai-analytics">AI Analytics</TabsTrigger>
             <TabsTrigger value="surveillance">Surveillance</TabsTrigger>
             <TabsTrigger value="health">Health Units</TabsTrigger>
             <TabsTrigger value="alerts">Alerts</TabsTrigger>
-            <TabsTrigger value="help-requests">Help Requests</TabsTrigger>
+            <TabsTrigger value="help-requests">Help</TabsTrigger>
             <TabsTrigger value="community">Community</TabsTrigger>
             <TabsTrigger value="crowd">Crowd Control</TabsTrigger>
           </TabsList>
@@ -424,6 +426,10 @@ const AdminDashboard = () => {
                 </div>
               </CardContent>
             </Card>
+          </TabsContent>
+
+          <TabsContent value="locations" className="space-y-6">
+            <LocationManagement />
           </TabsContent>
 
           <TabsContent value="ai-analytics" className="space-y-6">
