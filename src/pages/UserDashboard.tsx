@@ -4,16 +4,23 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Progress } from "@/components/ui/progress";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   Users, MapPin, Phone, Heart, Shield, Navigation,
   Clock, AlertTriangle, ChevronLeft, Bell, Info,
-  Camera, Wifi, Battery, Signal, LogOut
+  Camera, Wifi, Battery, Signal, LogOut, UtensilsCrossed,
+  Search, Route, User
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { collection, onSnapshot, query, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import HelpRequestForm from "@/components/user/HelpRequestForm";
+import SOSButton from "@/components/emergency/SOSButton";
+import SafeRouteMap from "@/components/navigation/SafeRouteMap";
+import VolunteerConnect from "@/components/community/VolunteerConnect";
+import LostAndFound from "@/components/community/LostAndFound";
+import FreeFoodBoard from "@/components/community/FreeFoodBoard";
 
 interface EmergencyAlert {
   id: string;
@@ -145,34 +152,8 @@ const UserDashboard = () => {
       </header>
 
       <div className="p-4 space-y-6">
-        {/* Emergency Quick Actions */}
-        <Card className="bg-destructive/10 border-destructive/30 backdrop-blur-sm">
-          <CardHeader>
-            <CardTitle className="flex items-center text-destructive">
-              <Phone className="h-5 w-5 mr-2" />
-              Emergency Services
-            </CardTitle>
-            <CardDescription className="text-destructive/80">
-              Tap for immediate assistance - Available 24/7
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 gap-3">
-              <Button className="bg-destructive hover:bg-destructive/90 text-destructive-foreground h-16">
-                <div className="text-center">
-                  <Phone className="h-6 w-6 mx-auto mb-1" />
-                  <div className="text-sm">Emergency Call</div>
-                </div>
-              </Button>
-              <Button variant="outline" className="border-destructive/30 text-destructive hover:bg-destructive/10 h-16">
-                <div className="text-center">
-                  <Heart className="h-6 w-6 mx-auto mb-1" />
-                  <div className="text-sm">Medical Help</div>
-                </div>
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+        {/* SOS Emergency Button */}
+        <SOSButton />
 
         {/* Safety Alerts */}
         {safetyAlerts.length > 0 && (
@@ -191,141 +172,175 @@ const UserDashboard = () => {
           </div>
         )}
 
-        {/* My Help Requests Status */}
-        {myHelpRequests.length > 0 && (
-          <Card className="bg-blue-500/10 border-blue-500/30 backdrop-blur-sm">
-            <CardHeader>
-              <CardTitle className="flex items-center text-blue-400">
-                <Phone className="h-5 w-5 mr-2" />
-                Your Help Requests
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                {myHelpRequests.slice(0, 3).map((request) => (
-                  <div key={request.id} className="flex items-center justify-between p-3 border border-border/50 rounded-lg bg-card/30">
-                    <div>
-                      <div className="font-medium">{request.type.toUpperCase()}</div>
-                      <div className="text-sm text-muted-foreground">{request.location}</div>
-                    </div>
-                    <Badge variant={request.status === 'pending' ? 'secondary' : 'default'}>
-                      {request.status}
-                    </Badge>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        )}
+        {/* Main Features Tabs */}
+        <Tabs defaultValue="dashboard" className="space-y-6">
+          <TabsList className="grid w-full grid-cols-6 bg-card/60 backdrop-blur-sm">
+            <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
+            <TabsTrigger value="navigation">Navigation</TabsTrigger>
+            <TabsTrigger value="community">Community</TabsTrigger>
+            <TabsTrigger value="lost-found">Lost & Found</TabsTrigger>
+            <TabsTrigger value="food">Food</TabsTrigger>
+            <TabsTrigger value="volunteers">Volunteers</TabsTrigger>
+          </TabsList>
 
-        {/* Help Request Form */}
-        <HelpRequestForm />
-
-        {/* Current Location & Status */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <Card className="bg-card/60 backdrop-blur-sm border-border/50">
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                <MapPin className="h-5 w-5 mr-2" />
-                Your Location
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="text-lg font-semibold text-primary">{userLocation.current}</div>
-              <div className="text-sm text-muted-foreground">
-                <div>Zone: {userLocation.zone}</div>
-                <div>Coordinates: {userLocation.coordinates}</div>
-              </div>
-              <Button variant="outline" size="sm" className="w-full">
-                <Navigation className="h-4 w-4 mr-2" />
-                Get Directions
-              </Button>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-card/60 backdrop-blur-sm border-border/50">
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                <Users className="h-5 w-5 mr-2" />
-                Area Status
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-sm">Crowd Density</span>
-                <Badge variant="outline">Moderate</Badge>
-              </div>
-              <Progress value={65} className="w-full" />
-              <div className="text-sm text-muted-foreground">
-                Current: 342 people • Capacity: 500
-              </div>
-              <div className="text-xs text-green-400">
-                ✓ Safe to proceed • Alternative routes available
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Nearby Health Units */}
-        <Card className="bg-card/60 backdrop-blur-sm border-border/50">
-          <CardHeader>
-            <CardTitle className="flex items-center">
-              <Heart className="h-5 w-5 mr-2" />
-              Nearby Health Units
-            </CardTitle>
-            <CardDescription>Medical assistance within walking distance</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {healthUnits.length === 0 ? (
-                <p className="text-center text-muted-foreground py-4">No health units data available</p>
-              ) : (
-                healthUnits.map((unit) => (
-                  <div key={unit.id} className="flex items-center justify-between p-3 border border-border/50 rounded-lg bg-card/30 backdrop-blur-sm">
-                    <div className="flex items-center space-x-3">
-                      <div className="w-3 h-3 rounded-full bg-green-500" />
-                      <div>
-                        <div className="font-medium">{unit.name}</div>
-                        <div className="text-sm text-muted-foreground">{unit.location} • Staff: {unit.staff}</div>
+          <TabsContent value="dashboard" className="space-y-6">
+            {/* My Help Requests Status */}
+            {myHelpRequests.length > 0 && (
+              <Card className="bg-blue-500/10 border-blue-500/30 backdrop-blur-sm">
+                <CardHeader>
+                  <CardTitle className="flex items-center text-blue-400">
+                    <Phone className="h-5 w-5 mr-2" />
+                    Your Help Requests
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    {myHelpRequests.slice(0, 3).map((request) => (
+                      <div key={request.id} className="flex items-center justify-between p-3 border border-border/50 rounded-lg bg-card/30">
+                        <div>
+                          <div className="font-medium">{request.type.toUpperCase()}</div>
+                          <div className="text-sm text-muted-foreground">{request.location}</div>
+                        </div>
+                        <Badge variant={request.status === 'pending' ? 'secondary' : 'default'}>
+                          {request.status}
+                        </Badge>
                       </div>
-                    </div>
-                    <Badge variant="default">
-                      {unit.status}
-                    </Badge>
+                    ))}
                   </div>
-                ))
-              )}
-            </div>
-          </CardContent>
-        </Card>
+                </CardContent>
+              </Card>
+            )}
 
-        {/* Quick Contact */}
-        <Card className="bg-card/60 backdrop-blur-sm border-border/50">
-          <CardHeader>
-            <CardTitle className="flex items-center">
-              <Phone className="h-5 w-5 mr-2" />
-              Emergency Contacts
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {emergencyContacts.map((contact, index) => (
-                <Button
-                  key={index}
-                  variant="outline"
-                  className="h-16 justify-start hover:bg-accent"
-                  onClick={() => window.open(`tel:${contact.number}`, '_self')}
-                >
-                  <div className="text-left">
-                    <div className="font-medium">{contact.name}</div>
-                    <div className="text-sm text-muted-foreground">{contact.number}</div>
-                    <div className="text-xs text-primary">{contact.type}</div>
+            {/* Help Request Form */}
+            <HelpRequestForm />
+
+            {/* Current Location & Status */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <Card className="bg-card/60 backdrop-blur-sm border-border/50">
+                <CardHeader>
+                  <CardTitle className="flex items-center">
+                    <MapPin className="h-5 w-5 mr-2" />
+                    Your Location
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="text-lg font-semibold text-primary">{userLocation.current}</div>
+                  <div className="text-sm text-muted-foreground">
+                    <div>Zone: {userLocation.zone}</div>
+                    <div>Coordinates: {userLocation.coordinates}</div>
                   </div>
-                </Button>
-              ))}
+                  <Button variant="outline" size="sm" className="w-full">
+                    <Navigation className="h-4 w-4 mr-2" />
+                    Get Directions
+                  </Button>
+                </CardContent>
+              </Card>
+
+              <Card className="bg-card/60 backdrop-blur-sm border-border/50">
+                <CardHeader>
+                  <CardTitle className="flex items-center">
+                    <Users className="h-5 w-5 mr-2" />
+                    Area Status
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm">Crowd Density</span>
+                    <Badge variant="outline">Moderate</Badge>
+                  </div>
+                  <Progress value={65} className="w-full" />
+                  <div className="text-sm text-muted-foreground">
+                    Current: 342 people • Capacity: 500
+                  </div>
+                  <div className="text-xs text-green-400">
+                    ✓ Safe to proceed • Alternative routes available
+                  </div>
+                </CardContent>
+              </Card>
             </div>
-          </CardContent>
-        </Card>
+
+            {/* Nearby Health Units */}
+            <Card className="bg-card/60 backdrop-blur-sm border-border/50">
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  <Heart className="h-5 w-5 mr-2" />
+                  Nearby Health Units
+                </CardTitle>
+                <CardDescription>Medical assistance within walking distance</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  {healthUnits.length === 0 ? (
+                    <p className="text-center text-muted-foreground py-4">No health units data available</p>
+                  ) : (
+                    healthUnits.map((unit) => (
+                      <div key={unit.id} className="flex items-center justify-between p-3 border border-border/50 rounded-lg bg-card/30 backdrop-blur-sm">
+                        <div className="flex items-center space-x-3">
+                          <div className="w-3 h-3 rounded-full bg-green-500" />
+                          <div>
+                            <div className="font-medium">{unit.name}</div>
+                            <div className="text-sm text-muted-foreground">{unit.location} • Staff: {unit.staff}</div>
+                          </div>
+                        </div>
+                        <Badge variant="default">
+                          {unit.status}
+                        </Badge>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Quick Contact */}
+            <Card className="bg-card/60 backdrop-blur-sm border-border/50">
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  <Phone className="h-5 w-5 mr-2" />
+                  Emergency Contacts
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {emergencyContacts.map((contact, index) => (
+                    <Button
+                      key={index}
+                      variant="outline"
+                      className="h-16 justify-start hover:bg-accent"
+                      onClick={() => window.open(`tel:${contact.number}`, '_self')}
+                    >
+                      <div className="text-left">
+                        <div className="font-medium">{contact.name}</div>
+                        <div className="text-sm text-muted-foreground">{contact.number}</div>
+                        <div className="text-xs text-primary">{contact.type}</div>
+                      </div>
+                    </Button>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="navigation" className="space-y-6">
+            <SafeRouteMap />
+          </TabsContent>
+
+          <TabsContent value="community" className="space-y-6">
+            <VolunteerConnect />
+          </TabsContent>
+
+          <TabsContent value="lost-found" className="space-y-6">
+            <LostAndFound />
+          </TabsContent>
+
+          <TabsContent value="food" className="space-y-6">
+            <FreeFoodBoard />
+          </TabsContent>
+
+          <TabsContent value="volunteers" className="space-y-6">
+            <VolunteerConnect />
+          </TabsContent>
+        </Tabs>
 
         {/* System Status */}
         <Card className="bg-card/60 backdrop-blur-sm border-border/50">

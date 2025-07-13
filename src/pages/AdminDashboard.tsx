@@ -8,7 +8,8 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { 
   Shield, Users, Camera, AlertTriangle, MapPin, Activity, 
   Phone, Clock, ChevronLeft, Settings, Bell, Eye,
-  TrendingUp, TrendingDown, Zap, Heart, LogOut, Database
+  TrendingUp, TrendingDown, Zap, Heart, LogOut, Database,
+  Brain, Search, UtensilsCrossed
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -17,6 +18,7 @@ import { db } from "@/lib/firebase";
 import SurveillanceManagement from "@/components/admin/SurveillanceManagement";
 import HealthUnitsManagement from "@/components/admin/HealthUnitsManagement";
 import EmergencyAlertsManagement from "@/components/admin/EmergencyAlertsManagement";
+import AIAnalytics from "@/components/admin/AIAnalytics";
 
 interface EmergencyAlert {
   id: string;
@@ -44,13 +46,21 @@ const AdminDashboard = () => {
   const { userProfile, logout } = useAuth();
   const [activeAlerts, setActiveAlerts] = useState<EmergencyAlert[]>([]);
   const [helpRequests, setHelpRequests] = useState<HelpRequest[]>([]);
+  const [sosAlerts, setSosAlerts] = useState<any[]>([]);
+  const [volunteers, setVolunteers] = useState<any[]>([]);
+  const [lostItems, setLostItems] = useState<any[]>([]);
+  const [foodPoints, setFoodPoints] = useState<any[]>([]);
   const [realTimeData, setRealTimeData] = useState({
     totalUsers: 0,
     activeCameras: 152,
     totalCameras: 156,
     emergencyUnits: 12,
     responseTime: 2.3,
-    helpRequestsCount: 0
+    helpRequestsCount: 0,
+    sosAlertsCount: 0,
+    activeVolunteers: 0,
+    lostItemsCount: 0,
+    activeFoodPoints: 0
   });
 
   const [pilgrimStats] = useState([
@@ -91,10 +101,39 @@ const AdminDashboard = () => {
       }));
     });
 
+    // New real-time listeners for additional features
+    const unsubscribeSOS = onSnapshot(collection(db, 'sos_alerts'), (snapshot) => {
+      const alerts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setSosAlerts(alerts.filter(alert => alert.status === 'active'));
+      setRealTimeData(prev => ({ ...prev, sosAlertsCount: alerts.filter(alert => alert.status === 'active').length }));
+    });
+
+    const unsubscribeVolunteers = onSnapshot(collection(db, 'volunteers'), (snapshot) => {
+      const vols = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setVolunteers(vols);
+      setRealTimeData(prev => ({ ...prev, activeVolunteers: vols.filter(v => v.availability === 'available').length }));
+    });
+
+    const unsubscribeLostFound = onSnapshot(collection(db, 'lost_found'), (snapshot) => {
+      const items = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setLostItems(items);
+      setRealTimeData(prev => ({ ...prev, lostItemsCount: items.filter(item => item.status === 'lost').length }));
+    });
+
+    const unsubscribeFood = onSnapshot(collection(db, 'food_points'), (snapshot) => {
+      const points = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setFoodPoints(points);
+      setRealTimeData(prev => ({ ...prev, activeFoodPoints: points.filter(p => p.status === 'available').length }));
+    });
+
     return () => {
       unsubscribeAlerts();
       unsubscribeHelp();
       unsubscribeUsers();
+      unsubscribeSOS();
+      unsubscribeVolunteers();
+      unsubscribeLostFound();
+      unsubscribeFood();
     };
   }, []);
 
@@ -113,7 +152,7 @@ const AdminDashboard = () => {
               </Link>
               <Shield className="h-6 w-6 text-primary mr-3" />
               <h1 className="text-xl font-semibold bg-gradient-to-r from-primary to-blue-400 bg-clip-text text-transparent">
-                Admin Control Center
+                AI-Powered Control Center
               </h1>
             </div>
             <div className="flex items-center space-x-4">
@@ -122,7 +161,7 @@ const AdminDashboard = () => {
               </span>
               <Button variant="outline" size="sm" className="border-primary/20">
                 <Bell className="h-4 w-4 mr-2" />
-                Alerts ({activeAlerts.length})
+                Alerts ({activeAlerts.length + realTimeData.sosAlertsCount})
               </Button>
               <Button variant="outline" size="sm" className="border-primary/20">
                 <Phone className="h-4 w-4 mr-2" />
@@ -138,9 +177,22 @@ const AdminDashboard = () => {
 
       <div className="p-6">
         {/* Emergency Alerts */}
-        {activeAlerts.length > 0 && (
+        {(activeAlerts.length > 0 || sosAlerts.length > 0) && (
           <div className="mb-6 space-y-3">
-            {activeAlerts.slice(0, 3).map((alert) => (
+            {sosAlerts.slice(0, 2).map((alert) => (
+              <Alert key={alert.id} className="border-l-4 border-destructive bg-destructive/10 backdrop-blur-sm">
+                <AlertTriangle className="h-4 w-4" />
+                <AlertTitle className="flex items-center justify-between">
+                  <span>🆘 SOS ALERT - {alert.userName}</span>
+                  <Badge variant="destructive">CRITICAL</Badge>
+                </AlertTitle>
+                <AlertDescription>
+                  Location: {alert.locationString} • Contact: {alert.userPhone} • Time: {new Date(alert.timestamp?.toDate()).toLocaleTimeString()}
+                </AlertDescription>
+              </Alert>
+            ))}
+            
+            {activeAlerts.slice(0, 2).map((alert) => (
               <Alert key={alert.id} className={`border-l-4 ${
                 alert.severity === 'Critical' ? 'border-destructive bg-destructive/10' :
                 alert.severity === 'High' ? 'border-orange-500 bg-orange-500/10' :
@@ -163,21 +215,36 @@ const AdminDashboard = () => {
 
         {/* Main Dashboard */}
         <Tabs defaultValue="overview" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-6 bg-card/60 backdrop-blur-sm">
+          <TabsList className="grid w-full grid-cols-8 bg-card/60 backdrop-blur-sm">
             <TabsTrigger value="overview">Overview</TabsTrigger>
+            <TabsTrigger value="ai-analytics">AI Analytics</TabsTrigger>
             <TabsTrigger value="surveillance">Surveillance</TabsTrigger>
             <TabsTrigger value="health">Health Units</TabsTrigger>
             <TabsTrigger value="alerts">Alerts</TabsTrigger>
             <TabsTrigger value="help-requests">Help Requests</TabsTrigger>
+            <TabsTrigger value="community">Community</TabsTrigger>
             <TabsTrigger value="crowd">Crowd Control</TabsTrigger>
           </TabsList>
 
           <TabsContent value="overview" className="space-y-6">
-            {/* Key Metrics */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {/* Enhanced Key Metrics */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               <Card className="bg-card/60 backdrop-blur-sm border-border/50 hover:border-primary/20 transition-colors">
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Active Help Requests</CardTitle>
+                  <CardTitle className="text-sm font-medium">🆘 SOS Alerts</CardTitle>
+                  <AlertTriangle className="h-4 w-4 text-destructive" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold text-destructive">{realTimeData.sosAlertsCount}</div>
+                  <p className="text-xs text-muted-foreground">
+                    Critical emergencies
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Card className="bg-card/60 backdrop-blur-sm border-border/50 hover:border-primary/20 transition-colors">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Help Requests</CardTitle>
                   <Phone className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
@@ -190,14 +257,54 @@ const AdminDashboard = () => {
 
               <Card className="bg-card/60 backdrop-blur-sm border-border/50 hover:border-primary/20 transition-colors">
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Registered Users</CardTitle>
+                  <CardTitle className="text-sm font-medium">Active Volunteers</CardTitle>
+                  <Users className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold text-green-400">{realTimeData.activeVolunteers}</div>
+                  <p className="text-xs text-muted-foreground">
+                    <TrendingUp className="inline h-3 w-3 mr-1 text-green-400" />
+                    Available to help
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Card className="bg-card/60 backdrop-blur-sm border-border/50 hover:border-primary/20 transition-colors">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Lost & Found</CardTitle>
+                  <Search className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold text-orange-400">{realTimeData.lostItemsCount}</div>
+                  <p className="text-xs text-muted-foreground">
+                    Active cases
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Card className="bg-card/60 backdrop-blur-sm border-border/50 hover:border-primary/20 transition-colors">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Food Points</CardTitle>
+                  <UtensilsCrossed className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold text-blue-400">{realTimeData.activeFoodPoints}</div>
+                  <p className="text-xs text-muted-foreground">
+                    Active donations
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Card className="bg-card/60 backdrop-blur-sm border-border/50 hover:border-primary/20 transition-colors">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Total Users</CardTitle>
                   <Users className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold text-primary">{realTimeData.totalUsers}</div>
                   <p className="text-xs text-muted-foreground">
                     <TrendingUp className="inline h-3 w-3 mr-1 text-green-400" />
-                    Real-time count
+                    Registered pilgrims
                   </p>
                 </CardContent>
               </Card>
@@ -265,6 +372,10 @@ const AdminDashboard = () => {
             </Card>
           </TabsContent>
 
+          <TabsContent value="ai-analytics" className="space-y-6">
+            <AIAnalytics />
+          </TabsContent>
+
           <TabsContent value="surveillance" className="space-y-6">
             <SurveillanceManagement />
           </TabsContent>
@@ -317,6 +428,61 @@ const AdminDashboard = () => {
                 </div>
               </CardContent>
             </Card>
+          </TabsContent>
+
+          <TabsContent value="community" className="space-y-6">
+            {/* Community Management Dashboard */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <Card className="bg-card/60 backdrop-blur-sm border-border/50">
+                <CardHeader>
+                  <CardTitle className="flex items-center">
+                    <Users className="h-5 w-5 mr-2" />
+                    Volunteer Network
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    <div className="flex justify-between">
+                      <span>Total Volunteers</span>
+                      <span className="font-semibold">{volunteers.length}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Available Now</span>
+                      <span className="font-semibold text-green-400">{realTimeData.activeVolunteers}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Response Rate</span>
+                      <span className="font-semibold">94%</span>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="bg-card/60 backdrop-blur-sm border-border/50">
+                <CardHeader>
+                  <CardTitle className="flex items-center">
+                    <Search className="h-5 w-5 mr-2" />
+                    Lost & Found Status
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    <div className="flex justify-between">
+                      <span>Active Cases</span>
+                      <span className="font-semibold">{realTimeData.lostItemsCount}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Resolved Today</span>
+                      <span className="font-semibold text-green-400">12</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Resolution Rate</span>
+                      <span className="font-semibold">87%</span>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
           </TabsContent>
 
           <TabsContent value="crowd" className="space-y-6">
