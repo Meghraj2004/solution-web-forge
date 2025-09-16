@@ -36,35 +36,37 @@ const SOSButton = () => {
 
   const sendSOSAlert = async () => {
     try {
+      console.log('Starting SOS Alert process...');
+      console.log('User Profile:', userProfile);
+      console.log('Auth UID:', userProfile?.uid);
+      
+      // Check if user is authenticated
+      if (!userProfile?.uid) {
+        throw new Error('User not authenticated');
+      }
+      
       setIsActivated(true);
       
       // Get current location
       const currentLocation = await getCurrentLocation();
       setLocation(currentLocation);
 
-      console.log('Sending SOS Alert with data:', {
-        userId: userProfile?.uid,
-        userName: userProfile?.displayName || userProfile?.email || 'Unknown User',
-        userPhone: userProfile?.phoneNumber || 'Not provided',
-        location: currentLocation,
-        locationString: `${currentLocation.lat.toFixed(6)}, ${currentLocation.lng.toFixed(6)}`,
-        status: 'active',
-        type: 'emergency',
-        priority: 'critical'
-      });
-
-      // Send SOS to Firebase
-      const docRef = await addDoc(collection(db, 'sos_alerts'), {
-        userId: userProfile?.uid || 'anonymous',
-        userName: userProfile?.displayName || userProfile?.email || 'Unknown User',
-        userPhone: userProfile?.phoneNumber || 'Not provided',
+      const alertData = {
+        userId: userProfile.uid,
+        userName: userProfile.displayName || userProfile.email || 'Unknown User',
+        userPhone: userProfile.phoneNumber || 'Not provided',
         location: currentLocation,
         locationString: `${currentLocation.lat.toFixed(6)}, ${currentLocation.lng.toFixed(6)}`,
         timestamp: serverTimestamp(),
         status: 'active',
         type: 'emergency',
         priority: 'critical'
-      });
+      };
+
+      console.log('Sending SOS Alert with data:', alertData);
+
+      // Send SOS to Firebase
+      const docRef = await addDoc(collection(db, 'sos_alerts'), alertData);
 
       console.log('SOS Alert sent successfully with ID:', docRef.id);
 

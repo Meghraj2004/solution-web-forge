@@ -243,13 +243,61 @@ const AdminDashboard = () => {
           <div className="mb-6 space-y-3">
             {sosAlerts.slice(0, 2).map((alert) => (
               <Alert key={alert.id} className="border-l-4 border-destructive bg-destructive/10 backdrop-blur-sm">
-                <AlertTriangle className="h-4 w-4" />
+                <AlertTriangle className="h-4 w-4 text-destructive animate-pulse" />
                 <AlertTitle className="flex items-center justify-between">
-                  <span>🆘 SOS ALERT - {alert.userName}</span>
-                  <Badge variant="destructive">CRITICAL</Badge>
+                  <span className="text-destructive font-bold">🆘 EMERGENCY - {alert.userName}</span>
+                  <Badge variant="destructive" className="animate-pulse">LIVE SOS</Badge>
                 </AlertTitle>
-                <AlertDescription>
-                  Location: {alert.locationString} • Contact: {alert.userPhone} • Time: {alert.timestamp ? new Date(alert.timestamp.toDate()).toLocaleTimeString() : 'Just now'}
+                <AlertDescription className="space-y-3">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-sm">
+                    <div className="flex items-center space-x-1">
+                      <MapPin className="h-3 w-3 text-destructive" />
+                      <span className="font-semibold">Location:</span>
+                      <span className="font-mono text-xs bg-background px-1 rounded">{alert.locationString}</span>
+                    </div>
+                    <div className="flex items-center space-x-1">
+                      <Phone className="h-3 w-3 text-destructive" />
+                      <span className="font-semibold">Contact:</span>
+                      <span className="text-destructive font-semibold">{alert.userPhone}</span>
+                    </div>
+                    <div className="flex items-center space-x-1">
+                      <Clock className="h-3 w-3 text-destructive" />
+                      <span className="font-semibold">Time:</span>
+                      <span>{alert.timestamp ? new Date(alert.timestamp.toDate()).toLocaleTimeString() : 'Just now'}</span>
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <Button 
+                      size="sm" 
+                      variant="destructive" 
+                      onClick={() => window.open(`https://maps.google.com/?q=${alert.location.lat},${alert.location.lng}`, '_blank')}
+                      className="flex items-center space-x-1"
+                    >
+                      <MapPin className="h-3 w-3" />
+                      <span>View Location</span>
+                    </Button>
+                    <Button 
+                      size="sm" 
+                      variant="outline" 
+                      onClick={() => window.open(`tel:${alert.userPhone}`, '_self')}
+                      className="flex items-center space-x-1"
+                    >
+                      <Phone className="h-3 w-3" />
+                      <span>Call User</span>
+                    </Button>
+                    <Button 
+                      size="sm" 
+                      variant="outline" 
+                      onClick={() => {
+                        // Mark as responded (you can implement this)
+                        console.log('Marking SOS as responded:', alert.id);
+                      }}
+                      className="flex items-center space-x-1"
+                    >
+                      <Shield className="h-3 w-3" />
+                      <span>Respond</span>
+                    </Button>
+                  </div>
                 </AlertDescription>
               </Alert>
             ))}
