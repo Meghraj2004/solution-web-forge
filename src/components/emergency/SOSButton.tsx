@@ -42,10 +42,21 @@ const SOSButton = () => {
       const currentLocation = await getCurrentLocation();
       setLocation(currentLocation);
 
-      // Send SOS to Firebase
-      await addDoc(collection(db, 'sos_alerts'), {
+      console.log('Sending SOS Alert with data:', {
         userId: userProfile?.uid,
-        userName: userProfile?.displayName,
+        userName: userProfile?.displayName || userProfile?.email || 'Unknown User',
+        userPhone: userProfile?.phoneNumber || 'Not provided',
+        location: currentLocation,
+        locationString: `${currentLocation.lat.toFixed(6)}, ${currentLocation.lng.toFixed(6)}`,
+        status: 'active',
+        type: 'emergency',
+        priority: 'critical'
+      });
+
+      // Send SOS to Firebase
+      const docRef = await addDoc(collection(db, 'sos_alerts'), {
+        userId: userProfile?.uid || 'anonymous',
+        userName: userProfile?.displayName || userProfile?.email || 'Unknown User',
         userPhone: userProfile?.phoneNumber || 'Not provided',
         location: currentLocation,
         locationString: `${currentLocation.lat.toFixed(6)}, ${currentLocation.lng.toFixed(6)}`,
@@ -54,6 +65,8 @@ const SOSButton = () => {
         type: 'emergency',
         priority: 'critical'
       });
+
+      console.log('SOS Alert sent successfully with ID:', docRef.id);
 
       // Auto-call emergency services (simulated)
       setTimeout(() => {
@@ -68,6 +81,7 @@ const SOSButton = () => {
 
     } catch (error) {
       console.error('SOS Error:', error);
+      setIsActivated(false); // Reset state on error
       toast({
         title: "SOS Failed",
         description: "Could not send alert. Try calling emergency services directly.",

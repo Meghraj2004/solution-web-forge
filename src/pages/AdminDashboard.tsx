@@ -146,12 +146,19 @@ const AdminDashboard = () => {
 
     // New real-time listeners for additional features
     const unsubscribeSOS = onSnapshot(collection(db, 'sos_alerts'), (snapshot) => {
-      const alerts = snapshot.docs.map(doc => ({ 
-        id: doc.id, 
-        ...doc.data() 
-      } as SOSAlert));
-      setSosAlerts(alerts.filter(alert => alert.status === 'active'));
-      setRealTimeData(prev => ({ ...prev, sosAlertsCount: alerts.filter(alert => alert.status === 'active').length }));
+      console.log('SOS alerts updated. Total docs:', snapshot.size);
+      const alerts = snapshot.docs.map(doc => {
+        const data = doc.data();
+        console.log('SOS Alert data:', { id: doc.id, ...data });
+        return { 
+          id: doc.id, 
+          ...data 
+        } as SOSAlert;
+      });
+      const activeAlerts = alerts.filter(alert => alert.status === 'active');
+      console.log('Active SOS alerts:', activeAlerts.length);
+      setSosAlerts(activeAlerts);
+      setRealTimeData(prev => ({ ...prev, sosAlertsCount: activeAlerts.length }));
     });
 
     const unsubscribeVolunteers = onSnapshot(collection(db, 'volunteers'), (snapshot) => {
@@ -242,7 +249,7 @@ const AdminDashboard = () => {
                   <Badge variant="destructive">CRITICAL</Badge>
                 </AlertTitle>
                 <AlertDescription>
-                  Location: {alert.locationString} • Contact: {alert.userPhone} • Time: {new Date(alert.timestamp?.toDate()).toLocaleTimeString()}
+                  Location: {alert.locationString} • Contact: {alert.userPhone} • Time: {alert.timestamp ? new Date(alert.timestamp.toDate()).toLocaleTimeString() : 'Just now'}
                 </AlertDescription>
               </Alert>
             ))}
