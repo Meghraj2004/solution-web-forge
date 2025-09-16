@@ -36,19 +36,25 @@ const SOSButton = () => {
 
   const sendSOSAlert = async () => {
     try {
-      console.log('Starting SOS Alert process...');
+      console.log('=== SOS ALERT PROCESS STARTED ===');
       console.log('User Profile:', userProfile);
       console.log('Auth UID:', userProfile?.uid);
+      console.log('User Email:', userProfile?.email);
+      console.log('Display Name:', userProfile?.displayName);
       
       // Check if user is authenticated
       if (!userProfile?.uid) {
-        throw new Error('User not authenticated');
+        console.error('ERROR: User not authenticated');
+        throw new Error('Please login to send SOS alert');
       }
       
+      console.log('✓ User authentication verified');
       setIsActivated(true);
       
+      console.log('Getting current location...');
       // Get current location
       const currentLocation = await getCurrentLocation();
+      console.log('✓ Location obtained:', currentLocation);
       setLocation(currentLocation);
 
       const alertData = {
@@ -63,30 +69,52 @@ const SOSButton = () => {
         priority: 'critical'
       };
 
-      console.log('Sending SOS Alert with data:', alertData);
+      console.log('✓ Alert data prepared:', alertData);
+      console.log('Attempting to send to Firebase...');
 
       // Send SOS to Firebase
       const docRef = await addDoc(collection(db, 'sos_alerts'), alertData);
 
-      console.log('SOS Alert sent successfully with ID:', docRef.id);
+      console.log('✓ SOS Alert sent successfully with ID:', docRef.id);
+      console.log('=== SOS ALERT PROCESS COMPLETED ===');
 
       // Auto-call emergency services (simulated)
       setTimeout(() => {
+        console.log('Opening emergency call...');
         window.open('tel:+911234567890', '_self');
       }, 2000);
 
       toast({
-        title: "SOS Alert Sent",
-        description: "Emergency services have been notified of your location. Stay calm.",
+        title: "SOS Alert Sent Successfully!",
+        description: `Emergency alert sent! Location: ${alertData.locationString}. Help is on the way.`,
         variant: "destructive"
       });
 
     } catch (error) {
-      console.error('SOS Error:', error);
+      console.error('=== SOS ERROR DETAILS ===');
+      console.error('Error type:', error.constructor.name);
+      console.error('Error message:', error.message);
+      console.error('Error code:', error.code);
+      console.error('Full error:', error);
+      console.error('=== END SOS ERROR ===');
+      
       setIsActivated(false); // Reset state on error
+      
+      let errorMessage = "Could not send alert. Try calling emergency services directly.";
+      
+      if (error.message.includes('auth')) {
+        errorMessage = "Please login first to send SOS alert.";
+      } else if (error.message.includes('permission')) {
+        errorMessage = "Location permission denied. Enable location and try again.";
+      } else if (error.message.includes('network') || error.code === 'unavailable') {
+        errorMessage = "Network error. Check connection and try again.";
+      } else if (error.code === 'permission-denied') {
+        errorMessage = "Permission denied. Please login and try again.";
+      }
+      
       toast({
         title: "SOS Failed",
-        description: "Could not send alert. Try calling emergency services directly.",
+        description: errorMessage,
         variant: "destructive"
       });
     }
